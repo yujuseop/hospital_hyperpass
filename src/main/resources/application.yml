@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: hospital-hyper-pass
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/hyperpass}
+    username: ${DB_USERNAME:hyperpass}
+    password: ${DB_PASSWORD:hyperpass}
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.hyperpass.domain
+  configuration:
+    map-underscore-to-camel-case: true
+
+server:
+  port: 8080
