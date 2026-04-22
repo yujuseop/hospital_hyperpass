@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-size: 18px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    margin: 0;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply w-full bg-primary text-white font-semibold rounded-2xl
+           min-h-touch flex items-center justify-center text-lg
+           active:bg-primary-dark transition-colors;
+  }
+
+  .btn-kakao {
+    @apply w-full bg-kakao text-kakao-text font-semibold rounded-2xl
+           min-h-touch flex items-center justify-center text-lg gap-3
+           active:opacity-80 transition-opacity;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6;
+  }
+}
