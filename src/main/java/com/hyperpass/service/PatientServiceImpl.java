@@ -1,6 +1,7 @@
 package com.hyperpass.service;
 
 import com.hyperpass.domain.Patient;
+import com.hyperpass.dto.AuthRequest;
 import com.hyperpass.dto.PatientRegisterRequest;
 import com.hyperpass.dto.PatientResponse;
 import com.hyperpass.exception.PatientNotFoundException;
@@ -36,6 +37,19 @@ public class PatientServiceImpl implements PatientService {
         patient.setLastVisitAt(now);
         patientMapper.insert(patient);
 
+        return toResponse(patient);
+    }
+
+    @Override
+    public PatientResponse findOrCreateForAuth(AuthRequest request) {
+        Patient patient = patientMapper.findByCiValue(request.getCiValue());
+        if (patient == null) {
+            patient = new Patient();
+            patient.setCiValue(request.getCiValue());
+            patient.setName(request.getName());
+            patient.setPhone(request.getPhone());
+            patientMapper.insert(patient);
+        }
         return toResponse(patient);
     }
 
