@@ -19,7 +19,6 @@ public class Patient {
     private String gender;
     private String phone;
     private String encSsn;
-    private String encSsnIv;
     private LocalDateTime firstVisitAt;
     private LocalDateTime lastVisitAt;
     private LocalDateTime createdAt;

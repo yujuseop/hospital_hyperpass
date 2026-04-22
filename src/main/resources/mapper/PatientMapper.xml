@@ -11,8 +11,8 @@
         <result property="birthDate"    column="birth_date"/>
         <result property="gender"       column="gender"/>
         <result property="phone"        column="phone"/>
-        <result property="encSsn"       column="enc_ssn"/>
-        <result property="encSsnIv"     column="enc_ssn_iv"/>
+        <result property="encSsn"       column="enc_ssn"
+                typeHandler="com.hyperpass.util.CryptoTypeHandler"/>
         <result property="firstVisitAt" column="first_visit_at"/>
         <result property="lastVisitAt"  column="last_visit_at"/>
         <result property="createdAt"    column="created_at"/>
@@ -21,7 +21,7 @@
 
     <select id="findById" parameterType="long" resultMap="patientResultMap">
         SELECT id, ci_value, name, birth_date, gender, phone,
-               enc_ssn, enc_ssn_iv, first_visit_at, last_visit_at,
+               enc_ssn, first_visit_at, last_visit_at,
                created_at, updated_at
         FROM patient
         WHERE id = #{id}
@@ -29,7 +29,7 @@
 
     <select id="findByCiValue" parameterType="string" resultMap="patientResultMap">
         SELECT id, ci_value, name, birth_date, gender, phone,
-               enc_ssn, enc_ssn_iv, first_visit_at, last_visit_at,
+               enc_ssn, first_visit_at, last_visit_at,
                created_at, updated_at
         FROM patient
         WHERE ci_value = #{ciValue}

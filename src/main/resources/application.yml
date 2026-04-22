@@ -19,3 +19,8 @@ mybatis:
 
 server:
   port: 8080
+
+hyperpass:
+  security:
+    # 운영 환경: AES_SECRET_KEY 환경변수로 반드시 교체 (openssl rand -base64 32)
+    aes-key: ${AES_SECRET_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
