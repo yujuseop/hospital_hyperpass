@@ -1,16 +1,14 @@
-package com.hyperpass.domain;
+package com.hyperpass.dto;
 
+import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
-@Setter
-@NoArgsConstructor
-public class Patient {
+@Builder
+public class PatientResponse {
 
     private Long id;
     private String ciValue;
@@ -18,10 +16,7 @@ public class Patient {
     private LocalDate birthDate;
     private String gender;
     private String phone;
-    private String encSsn;
-    private String encSsnIv;
     private LocalDateTime firstVisitAt;
     private LocalDateTime lastVisitAt;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }
