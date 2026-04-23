@@ -15,7 +15,8 @@ public class VisitHistory {
     private Long patientId;
     private Long kioskId;
     private Long departmentId;
-    private String visitType;   // FIRST | RETURN
+    private String visitType;      // FIRST | RETURN
     private String status;
+    private String paymentStatus;  // PENDING | PAID
     private LocalDateTime visitedAt;
 }

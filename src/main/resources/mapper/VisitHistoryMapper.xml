@@ -5,13 +5,14 @@
 <mapper namespace="com.hyperpass.mapper.VisitHistoryMapper">
 
     <resultMap id="visitHistoryResultMap" type="com.hyperpass.domain.VisitHistory">
-        <id     property="id"           column="id"/>
-        <result property="patientId"    column="patient_id"/>
-        <result property="kioskId"      column="kiosk_id"/>
-        <result property="departmentId" column="department_id"/>
-        <result property="visitType"    column="visit_type"/>
-        <result property="status"       column="status"/>
-        <result property="visitedAt"    column="visited_at"/>
+        <id     property="id"            column="id"/>
+        <result property="patientId"     column="patient_id"/>
+        <result property="kioskId"       column="kiosk_id"/>
+        <result property="departmentId"  column="department_id"/>
+        <result property="visitType"     column="visit_type"/>
+        <result property="status"        column="status"/>
+        <result property="paymentStatus" column="payment_status"/>
+        <result property="visitedAt"     column="visited_at"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.hyperpass.domain.VisitHistory"
@@ -21,7 +22,7 @@
     </insert>
 
     <select id="findByPatientId" parameterType="long" resultMap="visitHistoryResultMap">
-        SELECT id, patient_id, kiosk_id, department_id, visit_type, status, visited_at
+        SELECT id, patient_id, kiosk_id, department_id, visit_type, status, payment_status, visited_at
         FROM visit_history
         WHERE patient_id = #{patientId}
         ORDER BY visited_at DESC
@@ -32,5 +33,20 @@
         FROM visit_history
         WHERE patient_id = #{patientId}
     </select>
+
+    <select id="findLatestTodayByPatientId" parameterType="long" resultMap="visitHistoryResultMap">
+        SELECT id, patient_id, kiosk_id, department_id, visit_type, status, payment_status, visited_at
+        FROM visit_history
+        WHERE patient_id = #{patientId}
+          AND DATE(visited_at) = CURRENT_DATE
+        ORDER BY visited_at DESC
+        LIMIT 1
+    </select>
+
+    <update id="updatePaymentStatus">
+        UPDATE visit_history
+        SET payment_status = #{paymentStatus}
+        WHERE id = #{id}
+    </update>
 
 </mapper>

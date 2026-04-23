@@ -14,4 +14,8 @@ public interface VisitHistoryMapper {
     List<VisitHistory> findByPatientId(@Param("patientId") Long patientId);
 
     int countByPatientId(@Param("patientId") Long patientId);
+
+    VisitHistory findLatestTodayByPatientId(@Param("patientId") Long patientId);
+
+    int updatePaymentStatus(@Param("id") Long id, @Param("paymentStatus") String paymentStatus);
 }
