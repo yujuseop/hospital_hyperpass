@@ -56,4 +56,11 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateSsn">
+        UPDATE patient
+        SET enc_ssn    = #{ssn, typeHandler=com.hyperpass.util.CryptoTypeHandler},
+            updated_at = now()
+        WHERE id = #{id}
+    </update>
+
 </mapper>

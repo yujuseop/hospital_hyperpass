@@ -16,4 +16,6 @@ public interface PatientMapper {
     int insert(Patient patient);
 
     int update(Patient patient);
+
+    int updateSsn(@Param("id") Long id, @Param("ssn") String ssn);
 }
