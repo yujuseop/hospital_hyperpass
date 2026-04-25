@@ -38,10 +38,10 @@ public class SecurityConfig {
                 .exceptionHandling(ex ->
                         ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/verify").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/health").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/symptoms/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/departments").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

@@ -3,6 +3,7 @@ package com.hyperpass.exception;
 import com.hyperpass.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -10,6 +11,22 @@ import java.time.LocalDateTime;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getDefaultMessage())
+                .orElse("요청 값이 올바르지 않습니다.");
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.builder()
+                        .status(400)
+                        .code("VALIDATION_ERROR")
+                        .message(message)
+                        .timestamp(LocalDateTime.now())
+                        .build());
+    }
 
     // 원무과 승인 단계에서 발생하는 상태/입력 오류를 사용자에게 명확히 전달한다.
     @ExceptionHandler(ReceptionApprovalException.class)

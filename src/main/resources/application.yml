@@ -24,3 +24,7 @@ hyperpass:
   security:
     # 운영 환경: AES_SECRET_KEY 환경변수로 반드시 교체 (openssl rand -base64 32)
     aes-key: ${AES_SECRET_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+  jwt:
+    # 운영 환경: JWT_SECRET 환경변수로 반드시 교체 (openssl rand -base64 32), AES 키와 다른 값 사용
+    secret: ${JWT_SECRET:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=}
+    expiration: 3600000
