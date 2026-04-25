@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hyperpass.mapper.HpTriageRecordMapper">
+
+    <insert id="insert" parameterType="com.hyperpass.domain.HpTriageRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO hp_triage_records (
+            reception_id, patient_id, main_symptom, symptom_keywords,
+            pain_area, pain_level, started_at_text, free_text
+        )
+        VALUES (
+            #{receptionId}, #{patientId}, #{mainSymptom}, #{symptomKeywords},
+            #{painArea}, #{painLevel}, #{startedAtText}, #{freeText}
+        )
+    </insert>
+
+</mapper>

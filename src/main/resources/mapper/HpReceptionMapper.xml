@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hyperpass.mapper.HpReceptionMapper">
+
+    <!-- 접수 정보 결과 매핑(실제 테이블 데이터) -->
+    <resultMap id="receptionResultMap" type="com.hyperpass.domain.HpReception">
+        <id     property="id"           column="id"/>
+        <result property="patientId"    column="patient_id"/>
+        <result property="departmentId" column="department_id"/>
+        <result property="approvedBy"   column="approved_by"/>
+        <result property="visitType"    column="visit_type"/>
+        <result property="status"       column="status"/>
+        <result property="idVerified"   column="is_id_verified"/>
+        <result property="idVerifiedAt" column="id_verified_at"/>
+        <result property="approvedAt"   column="approved_at"/>
+        <result property="createdAt"    column="created_at"/>
+        <result property="updatedAt"    column="updated_at"/>
+    </resultMap>
+
+    <!-- 원무과 대시보드 조회용 결과 매핑 -->
+    <resultMap id="pendingResultMap" type="com.hyperpass.dto.PendingReceptionResponse">
+        <id     property="receptionId"     column="reception_id"/>
+        <result property="patientId"       column="patient_id"/>
+        <result property="patientName"     column="patient_name"/>
+        <result property="visitType"       column="visit_type"/>
+        <result property="isIdVerified"    column="is_id_verified"/>
+        <result property="departmentId"    column="department_id"/>
+        <result property="departmentName"  column="department_name"/>
+        <result property="mainSymptom"     column="main_symptom"/>
+        <result property="symptomKeywords" column="symptom_keywords"/>
+        <result property="painArea"        column="pain_area"/>
+        <result property="painLevel"       column="pain_level"/>
+        <result property="freeText"        column="free_text"/>
+        <result property="submittedAt"     column="submitted_at"/>
+    </resultMap>
+
+    <select id="findById" parameterType="long" resultMap="receptionResultMap">
+        SELECT id, patient_id, department_id, approved_by, visit_type, status,
+               is_id_verified, id_verified_at, approved_at, created_at, updated_at
+        FROM hp_receptions
+        WHERE id = #{id}
+    </select>
+
+    <select id="findActiveByPatientId" parameterType="long" resultMap="receptionResultMap">
+        SELECT id, patient_id, department_id, approved_by, visit_type, status,
+               is_id_verified, id_verified_at, approved_at, created_at, updated_at
+        FROM hp_receptions
+        WHERE patient_id = #{patientId}
+          AND status = 'SUBMITTED'
+        LIMIT 1
+    </select>
+
+    <select id="findPending" resultMap="pendingResultMap">
+        SELECT
+            r.id                AS reception_id,
+            r.patient_id        AS patient_id,
+            CASE
+                WHEN char_length(p.name) >= 3
+                    THEN substr(p.name, 1, 1)
+                         || repeat('○', char_length(p.name) - 2)
+                         || substr(p.name, char_length(p.name), 1)
+                WHEN char_length(p.name) = 2
+                    THEN substr(p.name, 1, 1) || '○'
+                ELSE p.name
+            END                 AS patient_name,
+            r.visit_type        AS visit_type,
+            r.is_id_verified    AS is_id_verified,
+            r.department_id     AS department_id,
+            d.name              AS department_name,
+            t.main_symptom      AS main_symptom,
+            t.symptom_keywords  AS symptom_keywords,
+            t.pain_area         AS pain_area,
+            t.pain_level        AS pain_level,
+            t.free_text         AS free_text,
+            r.created_at        AS submitted_at
+        FROM hp_receptions r
+        JOIN hp_patients p ON p.id = r.patient_id
+        LEFT JOIN hp_departments d ON d.id = r.department_id
+        LEFT JOIN hp_triage_records t ON t.reception_id = r.id
+        WHERE r.status = 'SUBMITTED'
+        ORDER BY r.created_at ASC
+    </select>
+
+    <insert id="insert" parameterType="com.hyperpass.domain.HpReception"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO hp_receptions (patient_id, visit_type, status, is_id_verified, created_at, updated_at)
+        VALUES (#{patientId}, #{visitType}, #{status}, #{idVerified}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="updateIdVerified">
+        UPDATE hp_receptions
+        SET is_id_verified = TRUE,
+            id_verified_at = #{idVerifiedAt},
+            updated_at     = now()
+        WHERE id = #{id}
+          AND status = 'SUBMITTED'
+    </update>
+
+    <update id="updateApproval">
+        UPDATE hp_receptions
+        SET status        = 'APPROVED',
+            department_id = #{departmentId},
+            approved_by   = #{approvedBy},
+            approved_at   = #{approvedAt},
+            updated_at    = #{updatedAt}
+        WHERE id = #{id}
+          AND status = 'SUBMITTED'
+    </update>
+
+</mapper>

@@ -1,228 +1,145 @@
 -- 개발 환경 전용: 재시작 시 스키마 초기화 (mode: always)
 DROP TABLE IF EXISTS
-    symptom_department_mapping, audit_log, insurance_log,
-    waiting_queue, visit_history, hospital_patient_mapping,
-    department, patient, kiosk CASCADE;
-
--- =====================================================================
--- 키오스크 디바이스
--- =====================================================================
-CREATE TABLE kiosk (
-    id         BIGSERIAL    PRIMARY KEY,
-    device_id  VARCHAR(64)  NOT NULL UNIQUE,
-    location   VARCHAR(100),
-    active     BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP    NOT NULL DEFAULT now()
-);
-
-COMMENT ON TABLE kiosk IS
-    '병원 내 설치된 하이패스 키오스크 단말기 목록. 각 키오스크는 고유한 QR 생성 주체가 된다.';
-
-COMMENT ON COLUMN kiosk.id         IS '키오스크 내부 식별자 (자동 증가)';
-COMMENT ON COLUMN kiosk.device_id  IS '키오스크 고유 디바이스 ID (UUID 또는 시리얼 번호). QR 코드 생성 시 포함되어 어느 단말에서 접수했는지 추적';
-COMMENT ON COLUMN kiosk.location   IS '키오스크 설치 위치 (예: 1층 로비, 외래 3층). 원무과 대시보드에서 접수 위치 표시에 사용';
-COMMENT ON COLUMN kiosk.active     IS '운영 여부. false 이면 해당 단말에서 접수 불가 처리';
-COMMENT ON COLUMN kiosk.created_at IS '키오스크 등록 일시';
+    hp_identity_logs,
+    hp_triage_records,
+    hp_receptions,
+    hp_patients,
+    hp_staff,
+    hp_departments,
+    pre_consultations, reception_status_history, receptions,
+    notification_log, symptom_department_mapping, audit_log,
+    waiting_queue, staff, department, patient, kiosk,
+    hospital_patient_mapping, visit_history, insurance_log
+CASCADE;
 
 -- =====================================================================
 -- 진료과
 -- =====================================================================
-CREATE TABLE department (
+CREATE TABLE hp_departments (
     id   BIGSERIAL    PRIMARY KEY,
     code VARCHAR(20)  NOT NULL UNIQUE,
     name VARCHAR(100) NOT NULL
 );
 
-COMMENT ON TABLE department IS
-    '병원 진료과 목록. 증상-진료과 매핑 및 대기 순번 발급의 기준 단위가 된다.';
+COMMENT ON TABLE  hp_departments      IS '진료과 목록. 원무과 승인 시 직원이 선택하는 기준 단위.';
+COMMENT ON COLUMN hp_departments.code IS '진료과 코드 (예: INT=내과, ORT=정형외과)';
+COMMENT ON COLUMN hp_departments.name IS '진료과 표시명 (한국어)';
 
-COMMENT ON COLUMN department.id   IS '진료과 내부 식별자 (자동 증가)';
-COMMENT ON COLUMN department.code IS '진료과 코드 (예: INT=내과, ORT=정형외과). 시스템 내부 식별 및 HIS 연동 키로 사용';
-COMMENT ON COLUMN department.name IS '진료과 표시명 (한국어). 환자 UI 및 대시보드에 노출되는 이름';
+-- =====================================================================
+-- 원무과 직원 계정
+-- =====================================================================
+CREATE TABLE hp_staff (
+    id         BIGSERIAL    PRIMARY KEY,
+    username   VARCHAR(50)  NOT NULL UNIQUE,
+    password   VARCHAR(255) NOT NULL,
+    name       VARCHAR(100) NOT NULL,
+    role       VARCHAR(20)  NOT NULL DEFAULT 'STAFF'
+                            CHECK (role IN ('STAFF', 'ADMIN')),
+    created_at TIMESTAMP    NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE  hp_staff          IS '원무과 직원 계정. 대시보드 로그인 및 접수 승인 처리에 사용. password 는 BCrypt 해시로 저장.';
+COMMENT ON COLUMN hp_staff.role     IS 'STAFF=일반 원무과 직원, ADMIN=관리자';
+COMMENT ON COLUMN hp_staff.password IS 'BCrypt 해시. 평문 절대 저장 금지.';
 
 -- =====================================================================
 -- 환자
 -- =====================================================================
-CREATE TABLE patient (
-    id             BIGSERIAL    PRIMARY KEY,
-    ci_value       VARCHAR(128) NOT NULL UNIQUE,
-    name           VARCHAR(100) NOT NULL,
-    birth_date     DATE,
-    gender         CHAR(1)      CHECK (gender IN ('M', 'F')),
-    phone          VARCHAR(20),
-    enc_ssn        VARCHAR(512),
-    first_visit_at TIMESTAMP,
-    last_visit_at  TIMESTAMP,
-    created_at     TIMESTAMP    NOT NULL DEFAULT now(),
-    updated_at     TIMESTAMP    NOT NULL DEFAULT now()
+CREATE TABLE hp_patients (
+    id              BIGSERIAL    PRIMARY KEY,
+    name            VARCHAR(100) NOT NULL,
+    enc_rrn         TEXT,
+    address         VARCHAR(255),
+    phone           VARCHAR(20),
+    last_visit_date DATE,
+    created_at      TIMESTAMP    NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMP    NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE patient IS
-    '카카오 인증서로 본인확인된 환자 정보. 미들웨어의 핵심 엔티티이며 모든 접수·대기·보험 조회의 기준이 된다.';
-
-COMMENT ON COLUMN patient.id             IS '환자 내부 식별자 (자동 증가). HIS 환자 번호와 별개로 미들웨어 전용으로 사용';
-COMMENT ON COLUMN patient.ci_value       IS '카카오 인증서 CI(Connecting Information). 주민번호 기반으로 생성되는 고유 식별값으로, 환자를 초진/재진 구분하는 핵심 키. 평문 저장';
-COMMENT ON COLUMN patient.name           IS '환자 성명 (카카오 인증서에서 수신)';
-COMMENT ON COLUMN patient.birth_date     IS '환자 생년월일 (카카오 인증서에서 수신)';
-COMMENT ON COLUMN patient.gender         IS '성별. M=남성, F=여성';
-COMMENT ON COLUMN patient.phone          IS '환자 연락처. 알림톡 발송에 사용';
-COMMENT ON COLUMN patient.enc_ssn        IS '주민등록번호 AES-256 CBC 암호화 저장값. 포맷: Base64(IV):Base64(CIPHERTEXT). CryptoTypeHandler가 입출력 시 자동 암/복호화';
-COMMENT ON COLUMN patient.first_visit_at IS '미들웨어 기준 최초 접수 일시 (초진 시 기록)';
-COMMENT ON COLUMN patient.last_visit_at  IS '미들웨어 기준 최근 접수 일시 (접수마다 갱신)';
-COMMENT ON COLUMN patient.created_at     IS '레코드 최초 생성 일시';
-COMMENT ON COLUMN patient.updated_at     IS '레코드 최종 수정 일시';
+COMMENT ON TABLE  hp_patients                IS '병원 방문 환자 정보. enc_rrn 으로 동일 환자를 식별하며, last_visit_date 로 6개월 이내 재진 여부를 판별한다.';
+COMMENT ON COLUMN hp_patients.enc_rrn        IS '주민등록번호 AES-256 CBC 암호화 저장값. 포맷: Base64(IV):Base64(CIPHERTEXT). 평문은 메모리에서만 처리.';
+COMMENT ON COLUMN hp_patients.address        IS '환자 주소. HIS 연동 시 기본 인적 정보 전달 필드로 사용.';
+COMMENT ON COLUMN hp_patients.phone          IS '연락처. 접수 완료 알림톡 발송에 사용.';
+COMMENT ON COLUMN hp_patients.last_visit_date IS '가장 최근 접수 승인일. 6개월 초과 시 초진(신분증 확인 필요)으로 분류.';
 
 -- =====================================================================
--- 병원 HIS ↔ 미들웨어 환자 매핑
+-- 접수
 -- =====================================================================
-CREATE TABLE hospital_patient_mapping (
+CREATE TABLE hp_receptions (
     id             BIGSERIAL   PRIMARY KEY,
-    patient_id     BIGINT      NOT NULL REFERENCES patient(id),
-    his_patient_no VARCHAR(50) NOT NULL,
-    hospital_code  VARCHAR(20),
+    patient_id     BIGINT      NOT NULL REFERENCES hp_patients(id),
+    department_id  BIGINT      REFERENCES hp_departments(id),
+    approved_by    BIGINT      REFERENCES hp_staff(id),
+    visit_type     VARCHAR(10) NOT NULL
+                               CHECK (visit_type IN ('FIRST', 'RETURN')),
+    status         VARCHAR(20) NOT NULL DEFAULT 'SUBMITTED'
+                               CHECK (status IN ('SUBMITTED', 'APPROVED', 'CANCELLED')),
+    is_id_verified BOOLEAN     NOT NULL DEFAULT FALSE,
+    id_verified_at TIMESTAMP,
+    approved_at    TIMESTAMP,
     created_at     TIMESTAMP   NOT NULL DEFAULT now(),
-    UNIQUE (patient_id, hospital_code)
+    updated_at     TIMESTAMP   NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE hospital_patient_mapping IS
-    '미들웨어 환자(patient)와 병원 HIS(Hospital Information System) 환자 번호를 연결하는 매핑 테이블.
-     한 환자가 여러 병원을 이용할 경우 hospital_code별로 레코드가 생성된다.';
+CREATE INDEX idx_hp_receptions_status
+    ON hp_receptions (status, created_at DESC);
 
-COMMENT ON COLUMN hospital_patient_mapping.id             IS '매핑 내부 식별자';
-COMMENT ON COLUMN hospital_patient_mapping.patient_id     IS '미들웨어 환자 ID (patient.id 참조)';
-COMMENT ON COLUMN hospital_patient_mapping.his_patient_no IS '병원 HIS에서 부여한 환자 번호. REST API 연동 시 HIS 조회·등록의 키로 사용';
-COMMENT ON COLUMN hospital_patient_mapping.hospital_code  IS '병원 식별 코드. 다기관 확장 시 병원별로 구분하기 위한 값';
-COMMENT ON COLUMN hospital_patient_mapping.created_at     IS '매핑 생성 일시 (최초 HIS 연동 시점)';
+CREATE INDEX idx_hp_receptions_patient
+    ON hp_receptions (patient_id, created_at DESC);
+
+CREATE UNIQUE INDEX uq_hp_receptions_patient_active
+    ON hp_receptions (patient_id)
+    WHERE status = 'SUBMITTED';
+
+COMMENT ON TABLE  hp_receptions                IS '환자 1회 방문 접수 건. 환자 제출(SUBMITTED) → 직원 승인(APPROVED) 상태 흐름을 단일 레코드로 관리.';
+COMMENT ON COLUMN hp_receptions.visit_type     IS 'FIRST=초진 또는 6개월 초과 재진(신분증 확인 필요), RETURN=6개월 이내 재진';
+COMMENT ON COLUMN hp_receptions.status         IS 'SUBMITTED=환자 제출 완료 대기 중, APPROVED=직원 승인 완료, CANCELLED=취소';
+COMMENT ON COLUMN hp_receptions.department_id  IS '직원 승인 시 선택한 진료과. 승인 전에는 NULL.';
+COMMENT ON COLUMN hp_receptions.approved_by    IS '승인 처리한 직원 ID. 승인 전에는 NULL.';
+COMMENT ON COLUMN hp_receptions.is_id_verified IS 'FIRST 방문 시 직원이 신분증 확인 완료 여부. FALSE 이면 접수 승인 불가.';
+COMMENT ON COLUMN hp_receptions.id_verified_at IS '신분증 확인 완료 시각. 법적 근거 보존용.';
 
 -- =====================================================================
--- 내원 이력
+-- 사전 문진
 -- =====================================================================
-CREATE TABLE visit_history (
-    id            BIGSERIAL   PRIMARY KEY,
-    patient_id    BIGINT      NOT NULL REFERENCES patient(id),
-    kiosk_id      BIGINT      REFERENCES kiosk(id),
-    department_id BIGINT      REFERENCES department(id),
-    visit_type    VARCHAR(10) NOT NULL CHECK (visit_type IN ('FIRST', 'RETURN')),
-    status        VARCHAR(20) NOT NULL DEFAULT 'REGISTERED',
-    visited_at    TIMESTAMP   NOT NULL DEFAULT now()
+CREATE TABLE hp_triage_records (
+    id                BIGSERIAL    PRIMARY KEY,
+    reception_id      BIGINT       NOT NULL UNIQUE REFERENCES hp_receptions(id) ON DELETE CASCADE,
+    patient_id        BIGINT       NOT NULL REFERENCES hp_patients(id),
+    main_symptom      VARCHAR(50),
+    symptom_keywords  TEXT,
+    pain_area         VARCHAR(100),
+    pain_level        INT          CHECK (pain_level BETWEEN 0 AND 10),
+    started_at_text   VARCHAR(100),
+    free_text         TEXT,
+    created_at        TIMESTAMP    NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE visit_history IS
-    '환자의 키오스크 접수 이력. 접수 시마다 1건이 생성되며 원무과 통계·이력 조회에 활용된다.';
-
-COMMENT ON COLUMN visit_history.id            IS '내원 이력 식별자';
-COMMENT ON COLUMN visit_history.patient_id    IS '접수 환자 ID (patient.id 참조)';
-COMMENT ON COLUMN visit_history.kiosk_id      IS '접수에 사용된 키오스크 ID. NULL이면 직접 접수(비키오스크 경로)';
-COMMENT ON COLUMN visit_history.department_id IS '방문 진료과. NULL이면 접수 당시 진료과 미결정 상태';
-COMMENT ON COLUMN visit_history.visit_type    IS '방문 유형. FIRST=초진(CI 신규 등록), RETURN=재진(기존 CI 매칭)';
-COMMENT ON COLUMN visit_history.status        IS '접수 처리 상태. REGISTERED=접수완료, CANCELLED=취소 등';
-COMMENT ON COLUMN visit_history.visited_at    IS '접수 일시';
+COMMENT ON TABLE  hp_triage_records                  IS '환자가 접수 시 작성한 사전 문진. 원무과 승인 전 직원이 미리 확인하는 진료 준비 데이터.';
+COMMENT ON COLUMN hp_triage_records.main_symptom     IS '대표 증상 키워드 (예: 기침, 흉통)';
+COMMENT ON COLUMN hp_triage_records.symptom_keywords IS '복수 증상 키워드 CSV (예: 기침,발열)';
+COMMENT ON COLUMN hp_triage_records.pain_level       IS '통증 강도 0~10. 0=통증 없음, 10=극심한 통증.';
+COMMENT ON COLUMN hp_triage_records.started_at_text  IS '환자 자유 입력 증상 시작 시점 (예: 어제 저녁부터)';
+COMMENT ON COLUMN hp_triage_records.free_text        IS '환자가 의사에게 먼저 전달하고 싶은 자유 서술 내용';
 
 -- =====================================================================
--- 실시간 대기 순번
+-- 신분증 확인 이력
 -- =====================================================================
-CREATE TABLE waiting_queue (
-    id            BIGSERIAL   PRIMARY KEY,
-    patient_id    BIGINT      NOT NULL REFERENCES patient(id),
-    department_id BIGINT      REFERENCES department(id),
-    queue_number  INT         NOT NULL,
-    status        VARCHAR(20) NOT NULL DEFAULT 'WAITING'
-                              CHECK (status IN ('WAITING', 'CALLED', 'DONE', 'CANCELLED')),
-    queued_at     TIMESTAMP   NOT NULL DEFAULT now(),
-    called_at     TIMESTAMP,
-    completed_at  TIMESTAMP
+CREATE TABLE hp_identity_logs (
+    id           BIGSERIAL PRIMARY KEY,
+    reception_id BIGINT    NOT NULL REFERENCES hp_receptions(id),
+    staff_id     BIGINT    NOT NULL REFERENCES hp_staff(id),
+    verified_at  TIMESTAMP NOT NULL DEFAULT now()
 );
 
-COMMENT ON TABLE waiting_queue IS
-    '진료과별 실시간 대기 순번 테이블. Redis INCR으로 원자적 순번을 채번한 뒤 이 테이블에 영구 저장한다.
-     원무과 대시보드의 호출·완료 처리, 환자 알림톡 발송의 기준이 된다.';
-
-COMMENT ON COLUMN waiting_queue.id            IS '대기 레코드 식별자';
-COMMENT ON COLUMN waiting_queue.patient_id    IS '대기 중인 환자 ID (patient.id 참조)';
-COMMENT ON COLUMN waiting_queue.department_id IS '대기 진료과 ID. NULL이면 진료과 미배정 상태';
-COMMENT ON COLUMN waiting_queue.queue_number  IS '진료과 내 대기 순번. Redis INCR으로 발급된 값을 저장';
-COMMENT ON COLUMN waiting_queue.status        IS '대기 상태.
-    WAITING  = 대기 중 (접수 후 호출 전),
-    CALLED   = 호출됨 (원무과 또는 시스템이 환자 호출),
-    DONE     = 진료 완료,
-    CANCELLED= 대기 취소 (환자 이탈 등)';
-COMMENT ON COLUMN waiting_queue.queued_at    IS '대기 등록 일시';
-COMMENT ON COLUMN waiting_queue.called_at    IS '호출 일시. CALLED 상태 전환 시 기록';
-COMMENT ON COLUMN waiting_queue.completed_at IS '완료 일시. DONE 상태 전환 시 기록';
-
--- =====================================================================
--- 건강보험 자격 조회 이력
--- =====================================================================
-CREATE TABLE insurance_log (
-    id           BIGSERIAL   PRIMARY KEY,
-    patient_id   BIGINT      NOT NULL REFERENCES patient(id),
-    status       VARCHAR(20) NOT NULL CHECK (status IN ('APPROVED', 'INVALID', 'PENDING')),
-    raw_response TEXT,
-    queried_at   TIMESTAMP   NOT NULL DEFAULT now()
-);
-
-COMMENT ON TABLE insurance_log IS
-    '국민건강보험공단 자격 조회 결과 이력. 접수마다 조회하며 결과에 따라 접수 흐름이 분기된다.
-     현재는 Mock API 응답을 저장하며, 요양기관번호 발급 후 실연동으로 전환한다.';
-
-COMMENT ON COLUMN insurance_log.id           IS '조회 이력 식별자';
-COMMENT ON COLUMN insurance_log.patient_id   IS '조회 대상 환자 ID (patient.id 참조)';
-COMMENT ON COLUMN insurance_log.status       IS '자격 조회 결과.
-    APPROVED = 자격 확인 완료 → 하이패스 접수 진행,
-    INVALID  = 자격 이상 (급여 정지, 체납 등) → 창구 유도,
-    PENDING  = 조회 지연 또는 응답 오류 → 수납 보류';
-COMMENT ON COLUMN insurance_log.raw_response IS '공단 API 원본 응답 JSON. 장애 대응 및 감사 목적으로 보관 (SSN 등 민감 정보 포함 금지)';
-COMMENT ON COLUMN insurance_log.queried_at   IS '자격 조회 요청 일시';
-
--- =====================================================================
--- 감사 로그
--- =====================================================================
-CREATE TABLE audit_log (
-    id         BIGSERIAL   PRIMARY KEY,
-    actor_id   VARCHAR(64),
-    action     VARCHAR(50) NOT NULL,
-    target     VARCHAR(100),
-    detail     TEXT,
-    ip_address VARCHAR(45),
-    created_at TIMESTAMP   NOT NULL DEFAULT now()
-);
-
-COMMENT ON TABLE audit_log IS
-    '시스템 주요 행위에 대한 감사 로그. INSERT 전용 테이블로 UPDATE·DELETE 쿼리 작성 금지.
-     의료 데이터 접근 이력 보존 및 보안 감사에 사용된다.';
-
-COMMENT ON COLUMN audit_log.id         IS '감사 로그 식별자';
-COMMENT ON COLUMN audit_log.actor_id   IS '행위 주체 식별자. 원무과 직원 ID 또는 시스템 프로세스 명';
-COMMENT ON COLUMN audit_log.action     IS '수행된 행위 코드 (예: PATIENT_REGISTER, SSN_DECRYPT, QUEUE_CALL, INSURANCE_QUERY)';
-COMMENT ON COLUMN audit_log.target     IS '행위 대상 (예: patient:42, waiting_queue:17). SSN 등 민감 정보 기록 금지';
-COMMENT ON COLUMN audit_log.detail     IS '행위 부가 설명. 오류 메시지, 변경 전후 요약 등. SSN 기록 절대 금지';
-COMMENT ON COLUMN audit_log.ip_address IS '요청 발신 IP 주소. IPv4(최대 15자) 및 IPv6(최대 45자) 지원';
-COMMENT ON COLUMN audit_log.created_at IS '행위 발생 일시';
-
--- =====================================================================
--- 증상 → 진료과 매핑
--- =====================================================================
-CREATE TABLE symptom_department_mapping (
-    id            BIGSERIAL   PRIMARY KEY,
-    keyword       VARCHAR(50) NOT NULL,
-    department_id BIGINT      NOT NULL REFERENCES department(id),
-    priority      INT         NOT NULL DEFAULT 1,
-    UNIQUE (keyword, department_id)
-);
-
-COMMENT ON TABLE symptom_department_mapping IS
-    '환자가 입력한 증상 키워드와 진료과를 연결하는 매핑 테이블.
-     동일 키워드에 여러 진료과가 매핑될 수 있으며 priority 값이 낮을수록 우선 추천된다.';
-
-COMMENT ON COLUMN symptom_department_mapping.id            IS '매핑 식별자';
-COMMENT ON COLUMN symptom_department_mapping.keyword       IS '증상 키워드 (예: 기침, 골절, 흉통). 환자 UI 증상 선택 옵션과 일치해야 함';
-COMMENT ON COLUMN symptom_department_mapping.department_id IS '매핑된 진료과 ID (department.id 참조)';
-COMMENT ON COLUMN symptom_department_mapping.priority      IS '추천 우선순위. 값이 낮을수록 우선 표시 (1이 최우선)';
+COMMENT ON TABLE  hp_identity_logs             IS '직원이 신분증을 확인한 이력. 법적 본인 확인 의무 이행 근거로 보존.';
+COMMENT ON COLUMN hp_identity_logs.staff_id    IS '신분증 확인을 수행한 직원 ID';
+COMMENT ON COLUMN hp_identity_logs.verified_at IS '신분증 확인 수행 시각';
 
 -- =====================================================================
 -- 진료과 기초 데이터
 -- =====================================================================
-INSERT INTO department (code, name) VALUES
+INSERT INTO hp_departments (code, name) VALUES
     ('INT', '내과'),
     ('SUR', '외과'),
     ('ORT', '정형외과'),
@@ -236,18 +153,3 @@ INSERT INTO department (code, name) VALUES
     ('URO', '비뇨의학과'),
     ('CAR', '심장내과'),
     ('EMR', '응급의학과');
-
--- =====================================================================
--- 증상-진료과 기초 매핑 데이터
--- =====================================================================
-INSERT INTO symptom_department_mapping (keyword, department_id, priority) VALUES
-    ('기침',    (SELECT id FROM department WHERE code = 'INT'), 1),
-    ('발열',    (SELECT id FROM department WHERE code = 'INT'), 1),
-    ('복통',    (SELECT id FROM department WHERE code = 'INT'), 1),
-    ('골절',    (SELECT id FROM department WHERE code = 'ORT'), 1),
-    ('관절통',  (SELECT id FROM department WHERE code = 'ORT'), 1),
-    ('피부발진',(SELECT id FROM department WHERE code = 'DER'), 1),
-    ('눈충혈',  (SELECT id FROM department WHERE code = 'OPH'), 1),
-    ('이통',    (SELECT id FROM department WHERE code = 'ENT'), 1),
-    ('두통',    (SELECT id FROM department WHERE code = 'NEU'), 1),
-    ('흉통',    (SELECT id FROM department WHERE code = 'CAR'), 1);

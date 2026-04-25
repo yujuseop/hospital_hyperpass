@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hyperpass.mapper.HpPatientMapper">
+
+    <!-- 환자 정보 결과 매핑(실제 테이블 데이터) -->
+    <resultMap id="patientResultMap" type="com.hyperpass.domain.HpPatient">
+        <id     property="id"            column="id"/>
+        <result property="name"          column="name"/>
+        <result property="encRrn"        column="enc_rrn"/>
+        <result property="address"       column="address"/>
+        <result property="phone"         column="phone"/>
+        <result property="lastVisitDate" column="last_visit_date"/>
+        <result property="createdAt"     column="created_at"/>
+        <result property="updatedAt"     column="updated_at"/>
+    </resultMap>
+
+    <select id="findById" parameterType="long" resultMap="patientResultMap">
+        SELECT id, name, enc_rrn, address, phone, last_visit_date, created_at, updated_at
+        FROM hp_patients
+        WHERE id = #{id}
+    </select>
+
+    <select id="findByNameAndPhone" resultMap="patientResultMap">
+        SELECT id, name, enc_rrn, address, phone, last_visit_date, created_at, updated_at
+        FROM hp_patients
+        WHERE name = #{name} AND phone = #{phone}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.hyperpass.domain.HpPatient"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO hp_patients (name, enc_rrn, address, phone, last_visit_date)
+        VALUES (#{name}, #{encRrn}, #{address}, #{phone}, #{lastVisitDate})
+    </insert>
+
+    <update id="updateAuthProfile" parameterType="com.hyperpass.domain.HpPatient">
+        UPDATE hp_patients
+        SET enc_rrn = #{encRrn},
+            address = #{address},
+            phone = #{phone},
+            updated_at = now()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateLastVisitDate">
+        UPDATE hp_patients
+        SET last_visit_date = #{lastVisitDate}, updated_at = now()
+        WHERE id = #{id}
+    </update>
+
+</mapper>
