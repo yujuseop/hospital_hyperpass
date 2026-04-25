@@ -1,59 +1,73 @@
 export interface AuthResponse {
-  accessToken: string
-  tokenType: string
-  expiresIn: number
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
 }
 
-export interface PatientResponse {
-  id: number
-  ciValue: string
-  name: string
-  birthDate?: string
-  gender?: string
-  phone?: string
-  firstVisitAt?: string
-  lastVisitAt?: string
-  createdAt?: string
+export interface Department {
+  id: number;
+  code: string;
+  name: string;
 }
 
-export interface VisitRequest {
-  kioskId?: number
-  departmentId?: number
-  symptomKeyword?: string
-  hisPatientNo?: string
-  hospitalCode?: string
+export interface PreCheckInRequest {
+  mainSymptom?: string;
+  symptomKeywords?: string[];
+  painArea?: string;
+  painLevel?: number;
+  startedAtText?: string;
+  freeText?: string;
 }
 
-export interface VisitResponse {
-  visitId: number
-  patientId: number
-  visitType: 'FIRST' | 'RETURN'
-  queueNumber: number
-  departmentId: number
-  visitedAt: string
+export interface PreCheckInResponse {
+  receptionId: number;
+  visitType: "FIRST" | "RETURN";
+  status: string;
+  message: string;
 }
 
-export interface WaitingQueue {
-  id: number
-  patientId: number
-  departmentId: number
-  queueNumber: number
-  status: 'WAITING' | 'CALLED' | 'DONE' | 'CANCELLED'
-  queuedAt: string
-  calledAt?: string
-  completedAt?: string
+export interface StaffLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface StaffLoginResponse {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  name: string;
+}
+
+export interface PendingReceptionResponse {
+  receptionId: number;
+  patientId: number;
+  patientName: string;
+  visitType: "FIRST" | "RETURN";
+  isIdVerified: boolean;
+  departmentId?: number;
+  departmentName?: string;
+  mainSymptom?: string;
+  symptomKeywords?: string;
+  painArea?: string;
+  painLevel?: number;
+  freeText?: string;
+  submittedAt: string;
+}
+
+export interface ApproveReceptionRequest {
+  departmentId: number;
+}
+
+export interface ApproveReceptionResponse {
+  receptionId: number;
+  departmentId: number;
+  status: string;
+  approvedAt: string;
+  message: string;
 }
 
 export interface ApiError {
-  status: number
-  code: string
-  message: string
-}
-
-export interface Symptom {
-  keyword: string
-  label: string
-  icon: string
-  departmentId: number
-  departmentName: string
+  status: number;
+  code: string;
+  message: string;
 }

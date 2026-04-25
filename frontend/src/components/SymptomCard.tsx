@@ -1,4 +1,8 @@
-import type { Symptom } from '../types'
+export interface Symptom {
+  keyword: string
+  label: string
+  icon: string
+}
 
 interface Props {
   symptom: Symptom
@@ -11,7 +15,7 @@ export default function SymptomCard({ symptom, selected, onToggle }: Props) {
     <button
       onClick={() => onToggle(symptom.keyword)}
       className={`
-        flex flex-col items-center justify-center gap-2
+        relative flex flex-col items-center justify-center gap-2
         rounded-2xl border-2 p-4 min-h-touch w-full
         transition-all active:scale-95
         ${selected
@@ -22,7 +26,6 @@ export default function SymptomCard({ symptom, selected, onToggle }: Props) {
     >
       <span className="text-4xl">{symptom.icon}</span>
       <span className="text-base font-semibold">{symptom.label}</span>
-      <span className="text-sm text-gray-400">{symptom.departmentName}</span>
       {selected && (
         <span className="absolute top-2 right-2 text-primary text-lg">✓</span>
       )}
