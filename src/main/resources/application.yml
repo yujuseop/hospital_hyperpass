@@ -8,8 +8,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   sql:
     init:
-      mode: always
-      schema-locations: classpath:db/schema.sql
+      mode: never
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
@@ -18,7 +17,7 @@ mybatis:
     map-underscore-to-camel-case: true
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 hyperpass:
   security:
